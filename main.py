@@ -3,8 +3,16 @@ from pydantic import BaseModel, validator
 from typing import List
 import uuid
 import re
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # In-memory DB
 orders_db = {}
@@ -95,19 +103,28 @@ def update_status(order_id: str, status: str):
 
 # 3. View Orders
 @app.get("/orders")
-def get_orders(status: str = None, search: str = None):
+def get_orders(status: str = None, search: str = None, garment: str = None):
     results = list(orders_db.values())
 
+    # Status filter
     if status:
         normalized_status = status.strip().upper()
         results = [o for o in results if o["status"] == normalized_status]
 
+    # Name/phone search
     if search:
         search = search.strip().lower()
         results = [
             o for o in results
             if search in o["customer_name"].lower()
             or search in o["phone"]
+        ]
+
+    if garment:
+        garment = garment.strip().lower()
+        results = [
+            o for o in results
+            if any(garment in g.type.lower() for g in o["garments"])
         ]
 
     return results
