@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Laundry System</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: Arial; margin: 40px; background: #f4f6f8; }
+
+        h1 { color: #333; }
+
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+
+        .left { flex: 2; }
+        .right { flex: 1; }
+
+        .card {
+            background: white;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        input, select {
+            padding: 8px;
+            margin: 5px 0;
+            width: 250px;
+        }
+
+        button {
+            padding: 8px 12px;
+            margin: 5px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .status { padding: 5px 10px; border-radius: 5px; color: white; }
+        .RECEIVED { background: gray; }
+        .PROCESSING { background: orange; }
+        .READY { background: green; }
+        .DELIVERED { background: blue; }
+
+        .section { margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+
+<h1>🧺 Laundry Order System</h1>
+
+<div class="container">
+
+<!-- LEFT SIDE -->
+<div class="left">
+
+<!-- CREATE ORDER -->
+<div class="card">
+    <h2>Create Order</h2>
+
+    <input id="name" placeholder="Customer Name"><br>
+    <input id="phone" placeholder="Phone"><br>
+
+    <div id="garmentsContainer"></div>
+
+    <button onclick="addGarment()">➕ Add Garment</button><br>
+    <button onclick="createOrder()">Create Order</button>
+
+    <div id="result"></div>
+</div>
+
+<!-- VIEW ORDERS -->
+<div class="card">
+    <h2>View Orders</h2>
+
+    <input id="search" placeholder="Search name/phone">
+    <input id="status" placeholder="Status">
+    <input id="garmentSearch" placeholder="Garment">
+
+    <br>
+    <button onclick="getOrders()">Get Orders</button>
+
+    <div id="orders"></div>
+</div>
+
+<!-- UPDATE STATUS -->
+<div class="card">
+    <h2>Update Status</h2>
+
+    <input id="orderId" placeholder="Order ID">
+    <input id="newStatus" placeholder="New Status">
+
+    <button onclick="updateStatus()">Update Status</button>
+
+    <p id="statusResult"></p>
+</div>
+
+<!-- DASHBOARD -->
+<div class="card">
+    <h2>Dashboard</h2>
+
+    <button onclick="getDashboard()">Load Dashboard</button>
+
+    <div id="dashboard"></div>
+</div>
+
+</div>
+
+<!-- RIGHT SIDE -->
+<div class="right">
+
+<div class="card">
+    <h3>💰 Pricing</h3>
+
+    <button onclick="togglePrices()">Show / Hide</button>
+
+    <div id="priceList" style="display:none;">
+        <p>👕 Shirt: ₹10</p>
+        <p>👖 Pants: ₹15</p>
+        <p>🧵 Saree: ₹20</p>
+    </div>
+
+    <canvas id="priceChart"></canvas>
+</div>
+
+</div>
+
+</div>
+
+<script>
+const BASE_URL = "http://127.0.0.1:8000";
+
+let garmentCount = 0;
+
+function addGarment() {
+    garmentCount++;
+    const div = document.createElement("div");
+
+    div.innerHTML = `
+        <select id="g_${garmentCount}">
+            <option value="Shirt">Shirt</option>
+            <option value="Pants">Pants</option>
+            <option value="Saree">Saree</option>
+        </select>
+        <input id="q_${garmentCount}" type="number" placeholder="Quantity">
+    `;
+
+    document.getElementById("garmentsContainer").appendChild(div);
+}
+
+function collectGarments() {
+    let garments = [];
+
+    for (let i = 1; i <= garmentCount; i++) {
+        const type = document.getElementById(`g_${i}`)?.value;
+        const qty = document.getElementById(`q_${i}`)?.value;
+
+        if (type && qty) {
+            garments.push({
+                type: type,
+                quantity: parseInt(qty)
+            });
+        }
+    }
+    return garments;
+}
+
+function renderOrder(order) {
+    return `
+        <div class="card">
+            <p><strong>ID:</strong> ${order.id}</p>
+            <p><strong>Name:</strong> ${order.customer_name}</p>
+            <p><strong>Phone:</strong> ${order.phone}</p>
+            <p><strong>Garments:</strong>
+                ${order.garments.map(g => `${g.type} (${g.quantity})`).join(", ")}
+            </p>
+            <p><strong>Total:</strong> ₹${order.total}</p>
+            <p><strong>Status:</strong>
+                <span class="status ${order.status}">${order.status}</span>
+            </p>
+        </div>
+    `;
+}
+
+async function createOrder() {
+    const data = {
+        customer_name: document.getElementById("name").value,
+        phone: document.getElementById("phone").value,
+        garments: collectGarments()
+    };
+
+    const res = await fetch(`${BASE_URL}/orders`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+    });
+
+    const result = await res.json();
+
+    document.getElementById("result").innerHTML = renderOrder(result);
+}
+
+async function getOrders() {
+    const search = document.getElementById("search").value;
+    const status = document.getElementById("status").value;
+    const garment = document.getElementById("garmentSearch").value;
+
+    let url = `${BASE_URL}/orders?`;
+    if (search) url += `search=${search}&`;
+    if (status) url += `status=${status}&`;
+    if (garment) url += `garment=${garment}`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+
+    document.getElementById("orders").innerHTML =
+        data.map(o => renderOrder(o)).join("");
+}
+
+async function updateStatus() {
+    const id = document.getElementById("orderId").value;
+    const status = document.getElementById("newStatus").value;
+
+    const res = await fetch(`${BASE_URL}/orders/${id}/status?status=${status}`, {
+        method: "PUT"
+    });
+
+    const data = await res.json();
+
+    document.getElementById("statusResult").innerText =
+        "Updated to: " + data.status;
+}
+
+async function getDashboard() {
+    const res = await fetch(`${BASE_URL}/dashboard`);
+    const data = await res.json();
+
+    document.getElementById("dashboard").innerHTML = `
+        <p><strong>Total Orders:</strong> ${data.total_orders}</p>
+        <p><strong>Total Revenue:</strong> ₹${data.total_revenue}</p>
+        <pre>${JSON.stringify(data.orders_per_status, null, 2)}</pre>
+    `;
+}
+
+function togglePrices() {
+    const div = document.getElementById("priceList");
+    div.style.display = div.style.display === "none" ? "block" : "none";
+}
+
+// chart
+const ctx = document.getElementById('priceChart');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['Shirt', 'Pants', 'Saree'],
+        datasets: [{
+            label: 'Price (₹)',
+            data: [10, 15, 20]
+        }]
+    }
+});
+
+// default first garment
+addGarment();
+</script>
+
+</body>
+</html>
