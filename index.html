@@ -41,18 +41,35 @@
             cursor: pointer;
         }
 
+        .logout { background: red; }
+
         .status { padding: 5px 10px; border-radius: 5px; color: white; }
         .RECEIVED { background: gray; }
         .PROCESSING { background: orange; }
         .READY { background: green; }
         .DELIVERED { background: blue; }
-
-        .section { margin-bottom: 30px; }
     </style>
 </head>
+
 <body>
 
+<!-- 🔐 LOGIN PAGE -->
+<div id="loginPage" class="card">
+    <h2>🔐 Login</h2>
+
+    <input id="username" placeholder="Username"><br>
+    <input id="password" type="password" placeholder="Password"><br>
+
+    <button onclick="login()">Login</button>
+
+    <p id="loginStatus"></p>
+</div>
+
+<!-- 🧺 MAIN APP -->
+<div id="appPage" style="display:none;">
+
 <h1>🧺 Laundry Order System</h1>
+<button class="logout" onclick="logout()">Logout</button>
 
 <div class="container">
 
@@ -131,12 +148,69 @@
 </div>
 
 </div>
+</div>
 
 <script>
 const BASE_URL = "http://127.0.0.1:8000";
 
+let token = localStorage.getItem("token") || "";
 let garmentCount = 0;
 
+// 🔁 PAGE SWITCH
+window.onload = function () {
+    if (token) showApp();
+    else showLogin();
+};
+
+function showLogin() {
+    document.getElementById("loginPage").style.display = "block";
+    document.getElementById("appPage").style.display = "none";
+}
+
+function showApp() {
+    document.getElementById("loginPage").style.display = "none";
+    document.getElementById("appPage").style.display = "block";
+}
+
+// 🔐 LOGIN
+async function login() {
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+
+    const res = await fetch(`${BASE_URL}/login`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (data.access_token) {
+        token = data.access_token;
+        localStorage.setItem("token", token);
+        showApp();
+    } else {
+        document.getElementById("loginStatus").innerText = "❌ Invalid login";
+    }
+}
+
+// 🚪 LOGOUT
+function logout() {
+    localStorage.removeItem("token");
+    token = "";
+    showLogin();
+}
+
+function handleAuthError(res) {
+    if (res.status === 401) {
+        alert("Session expired. Please login again.");
+        logout();
+        return true;
+    }
+    return false;
+}
+
+// 🧺 GARMENTS
 function addGarment() {
     garmentCount++;
     const div = document.createElement("div");
@@ -170,6 +244,91 @@ function collectGarments() {
     return garments;
 }
 
+// 📦 CREATE ORDER (Protected)
+async function createOrder() {
+    const data = {
+        customer_name: document.getElementById("name").value,
+        phone: document.getElementById("phone").value,
+        garments: collectGarments()
+    };
+
+    const res = await fetch(`${BASE_URL}/orders`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+    });
+
+    if (handleAuthError(res)) return;
+
+    const result = await res.json();
+    document.getElementById("result").innerHTML = renderOrder(result);
+}
+
+// 🔍 VIEW
+async function getOrders() {
+    const search = document.getElementById("search").value;
+    const status = document.getElementById("status").value;
+    const garment = document.getElementById("garmentSearch").value;
+
+    let url = `${BASE_URL}/orders?`;
+    if (search) url += `search=${search}&`;
+    if (status) url += `status=${status}&`;
+    if (garment) url += `garment=${garment}`;
+
+    const res = await fetch(url, {
+        headers: {
+            "Authorization": `Bearer ${token}`
+        }
+    });
+
+    if (handleAuthError(res)) return;
+    const data = await res.json();
+
+    document.getElementById("orders").innerHTML =
+        data.map(o => renderOrder(o)).join("");
+}
+
+// 🔄 UPDATE (Protected)
+async function updateStatus() {
+    const id = document.getElementById("orderId").value;
+    const status = document.getElementById("newStatus").value;
+
+    const res = await fetch(`${BASE_URL}/orders/${id}/status?status=${status}`, {
+        method: "PUT",
+        headers: {
+            "Authorization": `Bearer ${token}`
+        }
+    });
+
+    if (handleAuthError(res)) return;
+
+    const data = await res.json();
+    document.getElementById("statusResult").innerText = "Updated to: " + data.status;
+}
+
+// DASHBOARD (Protected)
+async function getDashboard() {
+    const res = await fetch(`${BASE_URL}/dashboard`, {
+        headers: {
+            "Authorization": `Bearer ${token}`
+        }
+    });
+
+    if (handleAuthError(res)) return;
+
+    const data = await res.json();
+
+    document.getElementById("dashboard").innerHTML = `
+        <p><strong>Total Orders:</strong> ${data.total_orders}</p>
+        <p><strong>Total Revenue:</strong> ₹${data.total_revenue}</p>
+        <pre>${JSON.stringify(data.orders_per_status, null, 2)}</pre>
+    `;
+}
+
+// RENDER
 function renderOrder(order) {
     return `
         <div class="card">
@@ -187,72 +346,13 @@ function renderOrder(order) {
     `;
 }
 
-async function createOrder() {
-    const data = {
-        customer_name: document.getElementById("name").value,
-        phone: document.getElementById("phone").value,
-        garments: collectGarments()
-    };
-
-    const res = await fetch(`${BASE_URL}/orders`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(data)
-    });
-
-    const result = await res.json();
-
-    document.getElementById("result").innerHTML = renderOrder(result);
-}
-
-async function getOrders() {
-    const search = document.getElementById("search").value;
-    const status = document.getElementById("status").value;
-    const garment = document.getElementById("garmentSearch").value;
-
-    let url = `${BASE_URL}/orders?`;
-    if (search) url += `search=${search}&`;
-    if (status) url += `status=${status}&`;
-    if (garment) url += `garment=${garment}`;
-
-    const res = await fetch(url);
-    const data = await res.json();
-
-    document.getElementById("orders").innerHTML =
-        data.map(o => renderOrder(o)).join("");
-}
-
-async function updateStatus() {
-    const id = document.getElementById("orderId").value;
-    const status = document.getElementById("newStatus").value;
-
-    const res = await fetch(`${BASE_URL}/orders/${id}/status?status=${status}`, {
-        method: "PUT"
-    });
-
-    const data = await res.json();
-
-    document.getElementById("statusResult").innerText =
-        "Updated to: " + data.status;
-}
-
-async function getDashboard() {
-    const res = await fetch(`${BASE_URL}/dashboard`);
-    const data = await res.json();
-
-    document.getElementById("dashboard").innerHTML = `
-        <p><strong>Total Orders:</strong> ${data.total_orders}</p>
-        <p><strong>Total Revenue:</strong> ₹${data.total_revenue}</p>
-        <pre>${JSON.stringify(data.orders_per_status, null, 2)}</pre>
-    `;
-}
-
+// 💰 PRICING
 function togglePrices() {
     const div = document.getElementById("priceList");
     div.style.display = div.style.display === "none" ? "block" : "none";
 }
 
-// chart
+// 📊 CHART
 const ctx = document.getElementById('priceChart');
 new Chart(ctx, {
     type: 'bar',
@@ -265,7 +365,7 @@ new Chart(ctx, {
     }
 });
 
-// default first garment
+// INIT
 addGarment();
 </script>
 
