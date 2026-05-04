@@ -1,9 +1,22 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from pydantic import BaseModel, validator
 from typing import List
 import uuid
 import re
+import os
+from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from datetime import datetime, timedelta
+
+load_dotenv()
+users_db = {
+    os.getenv("ADMIN_USERNAME"): {
+        "username": os.getenv("ADMIN_USERNAME"),
+        "password": os.getenv("ADMIN_PASSWORD")
+    }
+}
 
 app = FastAPI()
 app.add_middleware(
@@ -13,6 +26,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 # In-memory DB
 orders_db = {}
@@ -49,6 +68,9 @@ class OrderCreate(BaseModel):
             raise ValueError("Phone number must be exactly 10 digits")
         return v
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 # Helper
 def calculate_total(garments):
@@ -62,10 +84,55 @@ def calculate_total(garments):
         total += PRICE_LIST[g.type] * g.quantity
     return total
 
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def authenticate_user(username: str, password: str):
+    user = users_db.get(username)
+    if not user or user["password"] != password:
+        return False
+    return user
+
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid authentication",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    user = users_db.get(username)
+    if user is None:
+        raise credentials_exception
+    return user
+
+@app.post("/login")
+def login(data: LoginRequest):
+    user = authenticate_user(data.username, data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    access_token = create_access_token(
+        data={"sub": user["username"]},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
 
 # 1. Create Order
 @app.post("/orders")
-def create_order(order: OrderCreate):
+def create_order(order: OrderCreate, user: dict = Depends(get_current_user)):
     order_id = str(uuid.uuid4())
 
     total = calculate_total(order.garments)
@@ -85,7 +152,7 @@ def create_order(order: OrderCreate):
 
 # 2. Update Status
 @app.put("/orders/{order_id}/status")
-def update_status(order_id: str, status: str):
+def update_status(order_id: str, status: str, user: dict = Depends(get_current_user)):
     if order_id not in orders_db:
         raise HTTPException(status_code=404, detail="Order not found")
 
@@ -103,7 +170,7 @@ def update_status(order_id: str, status: str):
 
 # 3. View Orders
 @app.get("/orders")
-def get_orders(status: str = None, search: str = None, garment: str = None):
+def get_orders(status: str = None, search: str = None, garment: str = None, user: dict = Depends(get_current_user)):
     results = list(orders_db.values())
 
     # Status filter
@@ -132,7 +199,7 @@ def get_orders(status: str = None, search: str = None, garment: str = None):
 
 # 4. Dashboard
 @app.get("/dashboard")
-def dashboard():
+def dashboard(user: dict = Depends(get_current_user)):
     total_orders = len(orders_db)
     total_revenue = sum(o["total"] for o in orders_db.values())
 
