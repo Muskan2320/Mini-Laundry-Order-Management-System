@@ -2,28 +2,34 @@
 
 ## 🚀 Overview
 
-This project is a lightweight backend system for managing laundry orders
-for a dry cleaning store.
+This project is a lightweight yet production-style system for managing laundry orders in a dry cleaning store.
 
-It supports: - Order creation with billing - Status tracking - Order
-filtering - Dashboard analytics
+It supports:
 
-Built using an AI-first development approach.
+* Order creation with billing
+* Status tracking
+* Order filtering and search
+* Dashboard analytics
+* Delivery time estimation (queue-based)
 
-------------------------------------------------------------------------
+Built using an **AI-first development approach** with iterative improvements.
+
+---
 
 ## ⚙️ Tech Stack
 
--   Python
--   FastAPI
--   Pydantic
--   In-memory storage
+* Python
+* FastAPI
+* MongoDB Atlas (cloud database)
+* Pydantic
+* HTML + JavaScript (Frontend)
+* JWT Authentication
 
-------------------------------------------------------------------------
+---
 
 ## ▶️ Setup Instructions
 
-``` bash
+```bash
 git clone https://github.com/Muskan2320/Mini-Laundry-Order-Management-System.git
 cd Mini-Laundry-Order-Management-System
 
@@ -31,65 +37,160 @@ pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-Open: http://127.0.0.1:8000/docs
+Open API Docs:
 
-------------------------------------------------------------------------
+```
+http://127.0.0.1:8000/docs
+```
+
+---
+
+## 🔐 Environment Variables
+
+Create a `.env` file:
+
+```
+SECRET_KEY=your_secret_key
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=admin123
+MONGO_URL=your_mongodb_connection_string
+```
+
+---
 
 ## 📌 Features
 
-### Create Order
+### 🧾 Create Order
 
--   Customer name & phone
--   Garments with quantity
--   Auto bill calculation
--   Unique order ID
+* Customer name & phone validation
+* Multiple garments with quantity
+* Automatic bill calculation
+* Unique order ID
+* Duplicate garment types merged (frontend optimization)
 
-### Order Status
+---
 
--   RECEIVED
--   PROCESSING
--   READY
--   DELIVERED
--   Case-insensitive input supported
+### 🔄 Order Status Management
 
-### View Orders
+* RECEIVED
+* PROCESSING
+* READY
+* DELIVERED
+* Case-insensitive updates supported
 
--   Filter by status
--   Search by name or phone
+---
 
-### Dashboard
+### 🔍 View Orders
 
--   Total orders
--   Total revenue
--   Orders per status
+* Filter by status
+* Search by name or phone
+* Filter by garment type
 
-------------------------------------------------------------------------
+---
 
-## 🤖 AI Usage
+### 📊 Dashboard
 
-### Tools
+* Total orders
+* Total revenue
+* Orders grouped by status
 
--   ChatGPT
+---
+
+### 🚚 Delivery Estimation (Advanced Feature)
+
+#### 1. System-Level Estimation
+
+* Calculates total pending garments
+* Uses daily processing capacity (30 garments/day)
+
+#### 2. Per-Order Estimation
+
+* Queue-based logic (FIFO using MongoDB `_id`)
+* Considers:
+
+  * Orders before current order
+  * Current order workload
+* Returns:
+
+  * Estimated days
+  * Expected delivery date
+
+---
+
+### 🔐 Authentication
+
+* JWT-based login system
+* Protected endpoints
+* Token-based authorization
+
+---
+
+### 🌐 Frontend
+
+* Simple HTML + JS interface
+* Create orders dynamically
+* Add/remove garments
+* Search and filter orders
+* Update order status
+* View dashboard
+* Estimate delivery by order ID
+
+---
+
+## 🤖 AI Usage Report
+
+### Tools Used
+
+* ChatGPT
 
 ### Where AI Helped
 
--   API scaffolding
--   Data modeling
--   Endpoint design
+* Initial API scaffolding
+* Database integration (MongoDB)
+* Authentication setup (JWT)
+* Frontend UI structure
+* Delivery estimation logic design
 
-### Improvements Made
+### Where Improvements Were Made
 
--   Added validation for phone numbers
--   Rejected invalid garment types
--   Made status handling case-insensitive
--   Improved filtering logic
+* Fixed MongoDB ObjectId serialization issues for proper API responses
+* Added strict input validation (e.g., 10-digit phone number format)
+* Improved input handling with validation checks for quantity and garment types
+* Added restrictions to prevent invalid or malformed data entries
+* Handled duplicate garments via frontend normalization (merged same types)
+* Made order status updates case-insensitive and validated against allowed values
+* Implemented queue-based delivery estimation using real-world capacity logic
+* Included current order workload in delivery estimation for accuracy
+* Enhanced error handling with clear API responses and frontend feedback
+* Improved overall UX by handling edge cases (invalid login, empty inputs, etc.)
 
-------------------------------------------------------------------------
+---
 
 ## ⚖️ Tradeoffs
 
--   No database (in-memory)
--   No authentication
+* Single-file backend (kept simple for speed)
+* Basic authentication (no user roles)
+* No pagination on large datasets
+* UI is minimal (functionality-focused)
 
-------------------------------------------------------------------------
+---
 
+## 🚀 Future Improvements
+
+* Role-based authentication
+* Pagination & sorting
+* Better UI (React)
+* Order timestamps for more accurate scheduling
+* Notifications for order readiness
+* Docker + CI/CD pipeline
+
+---
+
+## 🎯 Key Highlights
+
+* End-to-end system (frontend + backend + DB)
+* Real-world business logic (queue-based delivery estimation)
+* AI-assisted development with manual refinements
+* Production-like architecture using cloud database
+
+---
