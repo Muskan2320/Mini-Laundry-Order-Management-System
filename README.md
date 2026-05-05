@@ -51,8 +51,8 @@ Create a `.env` file:
 
 ```
 SECRET_KEY=your_secret_key
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin123
+ADMIN_USERNAME=username
+ADMIN_PASSWORD=password
 MONGO_URL=your_mongodb_connection_string
 ```
 
