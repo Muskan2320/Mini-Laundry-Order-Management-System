@@ -145,13 +145,24 @@
     <canvas id="priceChart"></canvas>
 </div>
 
+<div class="card">
+    <h2>Estimate Delivery (By Order ID)</h2>
+
+    <input id="estimateOrderId" placeholder="Enter Order ID">
+
+    <button onclick="estimateDelivery()">Get Estimate</button>
+
+    <div id="estimateResult"></div>
+</div>
+
 </div>
 
 </div>
 </div>
 
 <script>
-const BASE_URL = "http://127.0.0.1:8000";
+{% comment %} const BASE_URL = "http://127.0.0.1:8000"; {% endcomment %}
+const BASE_URL = "https://your-app.onrender.com";
 
 let token = localStorage.getItem("token") || "";
 let garmentCount = 0;
@@ -185,12 +196,14 @@ async function login() {
 
     const data = await res.json();
 
-    if (data.access_token) {
+    if (res.status === 200 && data.access_token) {
         token = data.access_token;
         localStorage.setItem("token", token);
+        document.getElementById("loginStatus").innerText = "✅ Login successful";
         showApp();
     } else {
-        document.getElementById("loginStatus").innerText = "❌ Invalid login";
+        document.getElementById("loginStatus").innerText =
+            data.detail || "❌ Wrong username or password";
     }
 }
 
@@ -228,19 +241,31 @@ function addGarment() {
 }
 
 function collectGarments() {
-    let garments = [];
+    let garmentMap = {};
 
-    for (let i = 1; i <= garmentCount; i++) {
-        const type = document.getElementById(`g_${i}`)?.value;
-        const qty = document.getElementById(`q_${i}`)?.value;
+    const rows = document.getElementById("garmentsContainer").children;
 
-        if (type && qty) {
-            garments.push({
-                type: type,
-                quantity: parseInt(qty)
-            });
+    for (let row of rows) {
+        const type = row.querySelector("select").value;
+        const qty = parseInt(row.querySelector("input").value);
+
+        if (!qty) continue;
+
+        if (garmentMap[type]) {
+            garmentMap[type] += qty;
+        } else {
+            garmentMap[type] = qty;
         }
     }
+
+    let garments = [];
+    for (let type in garmentMap) {
+        garments.push({
+            type: type,
+            quantity: garmentMap[type]
+        });
+    }
+
     return garments;
 }
 
@@ -326,6 +351,40 @@ async function getDashboard() {
         <p><strong>Total Revenue:</strong> ₹${data.total_revenue}</p>
         <pre>${JSON.stringify(data.orders_per_status, null, 2)}</pre>
     `;
+}
+
+async function estimateDelivery() {
+    const orderId = document.getElementById("estimateOrderId").value;
+
+    const res = await fetch(`${BASE_URL}/estimate-delivery/${orderId}`, {
+        headers: {
+            "Authorization": `Bearer ${token}`
+        }
+    });
+
+    // handle auth expiry
+    if (res.status === 401) {
+        alert("Session expired. Please login again.");
+        logout();
+        return;
+    }
+
+    const data = await res.json();
+
+    // show response nicely
+    if (data.message) {
+        document.getElementById("estimateResult").innerHTML = `
+            <p><strong>${data.message}</strong></p>
+        `;
+    } else {
+        document.getElementById("estimateResult").innerHTML = `
+            <p><strong>Order ID:</strong> ${data.order_id}</p>
+            <p><strong>Status:</strong> ${data.status}</p>
+            <p><strong>Garments Before:</strong> ${data.garments_before}</p>
+            <p><strong>Estimated Days:</strong> ${data.estimated_days}</p>
+            <p><strong>Expected Delivery:</strong> ${data.expected_delivery_date}</p>
+        `;
+    }
 }
 
 // RENDER
