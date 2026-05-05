@@ -16,6 +16,14 @@ Built using an **AI-first development approach** with iterative improvements.
 
 ---
 
+## 🎥 Demo & Live Application
+
+* 🌍 **Live App:**
+  https://mini-laundry-order-management-system-bwtu.onrender.com/
+
+* 🎬 **Demo Video (Loom):**
+  https://www.loom.com/share/4bac1958599f4090a2b7174008f639b9
+
 ## ⚙️ Tech Stack
 
 * Python
